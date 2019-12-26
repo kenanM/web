@@ -277,7 +277,7 @@ export class AccountMenu {
             try {
               var data = JSON.parse(e.target.result);
               $timeout(function(){
-                if(data.auth_params) {
+                if(data.auth_params || data.keyParams) {
                   // request password
                   $scope.importData.requestPassword = true;
                   $scope.importData.data = data;
@@ -325,8 +325,9 @@ export class AccountMenu {
         });
       }
 
-      if(data.auth_params) {
-        protocolManager.computeEncryptionKeysForUser(password, data.auth_params).then((keys) => {
+      const keyParams = data.keyParams || data.auth_params;
+      if(keyParams) {
+        protocolManager.computeRootKey({password, keyParams: keyParams}).then((keys) => {
           try {
             protocolManager.decryptMultipleItems(data.items, keys, false) /* throws = false as we don't want to interrupt all decryption if just one fails */
             .then(() => {

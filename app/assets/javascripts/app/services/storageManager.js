@@ -1,4 +1,4 @@
-import { protocolManager, SNEncryptedStorage, SFStorageManager , SFItemParams } from 'snjs';
+import { protocolManager, SNEncryptedStorage, SFStorageManager } from 'snjs';
 
 export class MemoryStorage {
   constructor() {
@@ -158,19 +158,24 @@ export class StorageManager extends SFStorageManager {
   }
 
   async writeEncryptedStorageToDisk() {
-    var encryptedStorage = new SNEncryptedStorage();
+    const encryptedStorage = new SNEncryptedStorage();
     // Copy over totality of current storage
     encryptedStorage.content.storage = this.storageAsHash();
 
     // Save new encrypted storage in Fixed storage
-    var params = new SFItemParams(encryptedStorage, this.encryptedStorageKeys, this.encryptedStorageAuthParams);
-    const syncParams = await params.paramsForSync();
+    const syncParams = await protocolManager.generateExportParameters({
+      item: encryptedStorage,
+      keys: this.encryptedStorageKeys,
+      authParams: this.encryptedStorageAuthParams,
+      exportType: SNProtocolOperator.ExportTypeSync
+    })
+
     this.setItem("encryptedStorage", JSON.stringify(syncParams), StorageManager.Fixed);
   }
 
   async decryptStorage() {
-    var stored = JSON.parse(this.getItemSync("encryptedStorage", StorageManager.Fixed));
-    await protocolManager.decryptItem(stored, this.encryptedStorageKeys);
+    const stored = JSON.parse(this.getItemSync("encryptedStorage", StorageManager.Fixed));
+    await protocolManager.decryptItem({item: stored, keys: this.encryptedStorageKeys});
     var encryptedStorage = new SNEncryptedStorage(stored);
 
     for(var key of Object.keys(encryptedStorage.content.storage)) {

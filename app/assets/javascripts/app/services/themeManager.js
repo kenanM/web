@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import angular from 'angular';
-import { SNTheme, SFItemParams } from 'snjs';
+import { SNTheme, protocolManager } from 'snjs';
 import { StorageManager } from './storageManager';
 
 export class ThemeManager {
@@ -109,9 +109,11 @@ export class ThemeManager {
 
   async cacheThemes() {
     let mapped = await Promise.all(this.activeThemes.map(async (theme) => {
-      let transformer = new SFItemParams(theme);
-      let params = await transformer.paramsForLocalStorage();
-      return params;
+      const itemParams = await protocolManager.generateExportParameters({
+        item: theme,
+        exportType: SNProtocolOperator.ExportTypeLocalStorage
+      })
+      return itemParams;
     }));
     let data = JSON.stringify(mapped);
     return this.storageManager.setItem(ThemeManager.CachedThemesKey, data, StorageManager.Fixed);

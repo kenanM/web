@@ -33,7 +33,7 @@ export class PrivilegesManager extends SFPrivilegesManager {
         return storageManager.getItem(key, storageManager.bestStorageMode());
       },
       verifyAccountPassword: async (password) => {
-        return authManager.verifyAccountPassword(password);
+        return keyManager.verifyAccountPassword(password);
       },
       verifyLocalPasscode: async (passcode) => {
         return passcodeManager.verifyPasscode(passcode);

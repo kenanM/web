@@ -1,4 +1,6 @@
-export class DBManager {
+import { SNDatabaseManager } from 'snjs';
+
+export class DBManager extends SNDatabaseManager {
   /* @ngInject */
   constructor(alertManager) {
     this.locked = true;

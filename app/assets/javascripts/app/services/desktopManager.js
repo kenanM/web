@@ -1,7 +1,7 @@
 // An interface used by the Desktop app to interact with SN
 import _ from 'lodash';
 import { isDesktopApplication } from '@/utils';
-import { SFItemParams, SFModelManager } from 'snjs';
+import { protocolManager, SFModelManager } from 'snjs';
 
 export class DesktopManager {
   /* @ngInject */
@@ -11,12 +11,14 @@ export class DesktopManager {
     modelManager,
     syncManager,
     authManager,
-    passcodeManager
+    passcodeManager,
+    keyManager
   ) {
     this.passcodeManager = passcodeManager;
     this.modelManager = modelManager;
     this.authManager = authManager;
     this.syncManager = syncManager;
+    this.keyManager = keyManager;
     this.$rootScope = $rootScope;
     this.timeout = $timeout;
     this.updateObservers = [];
@@ -52,7 +54,12 @@ export class DesktopManager {
     Keys are not passed into ItemParams, so the result is not encrypted
    */
   async convertComponentForTransmission(component) {
-    return new SFItemParams(component).paramsForExportFile(true);
+    const itemParams = await protocolManager.generateExportParameters({
+      item: component,
+      exportType: SNProtocolOperator.ExportTypeFile,
+      includeDeleted: true
+    });
+    return itemParams;
   }
 
   // All `components` should be installed
@@ -183,19 +190,11 @@ export class DesktopManager {
   }
 
   async desktop_requestBackupFile(callback) {
-    var keys, authParams;
-    if(this.authManager.offline() && this.passcodeManager.hasPasscode()) {
-      keys = this.passcodeManager.keys();
-      authParams = this.passcodeManager.passcodeAuthParams();
-    } else {
-      keys = await this.authManager.keys();
-      authParams = await this.authManager.getAuthParams();
-    }
-
+    const keyParams = await this.keyManager.getRootKeyKeyParams();
+    const returnNullOnEmpty = true;
     this.modelManager.getAllItemsJSONData(
-      keys,
-      authParams,
-      true /* return null on empty */
+      keyParams,
+      returnNullOnEmpty
     ).then((data) => {
       callback(data);
     })

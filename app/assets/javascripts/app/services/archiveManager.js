@@ -1,4 +1,5 @@
 import { PrivilegesManager } from '@/services/privilegesManager';
+import { protocolManager } from 'snjs';
 
 export class ArchiveManager {
   /* @ngInject */
@@ -20,17 +21,7 @@ export class ArchiveManager {
   async downloadBackupOfItems(items, encrypted) {
     let run = async () => {
       // download in Standard Notes format
-      var keys, authParams;
-      if(encrypted) {
-        if(this.authManager.offline() && this.passcodeManager.hasPasscode()) {
-          keys = this.passcodeManager.keys();
-          authParams = this.passcodeManager.passcodeAuthParams();
-        } else {
-          keys = await this.authManager.keys();
-          authParams = await this.authManager.getAuthParams();
-        }
-      }
-      this.__itemsData(items, keys, authParams).then((data) => {
+      this.__itemsData(items, encrypted).then((data) => {
         let modifier = encrypted ? "Encrypted" : "Decrypted";
         this.__downloadData(data, `Standard Notes ${modifier} Backup - ${this.__formattedDate()}.txt`);
 
@@ -64,8 +55,9 @@ export class ArchiveManager {
     return string;
   }
 
-  async __itemsData(items, keys, authParams) {
-    let data = await this.modelManager.getJSONDataForItems(items, keys, authParams);
+  async __itemsData(items, encrypted) {
+    const keyParams = encrypted ? await protocolManager.getRootKeyKeyParams() : null;
+    let data = await this.modelManager.getJSONDataForItems(items, keyParams);
     let blobData = new Blob([data], {type: 'text/json'});
     return blobData;
   }

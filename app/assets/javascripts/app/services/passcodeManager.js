@@ -75,53 +75,45 @@ export class PasscodeManager {
     var authParams = JSON.parse(this.storageManager.getItemSync("offlineParams", StorageManager.Fixed));
     if(authParams && !authParams.version) {
       var keys = this.keys();
-      if(keys && keys.ak) {
-        // If there's no version stored, and there's an ak, it has to be 002. Newer versions would have their version stored in authParams.
-        authParams.version = "002";
-      } else {
-        authParams.version = "001";
-      }
+      authParams.version = keys.version;
     }
     return authParams;
   }
 
   async verifyPasscode(passcode) {
-    return new Promise(async (resolve, reject) => {
-      var params = this.passcodeAuthParams();
-      let keys = await protocolManager.computeEncryptionKeysForUser(passcode, params);
-      if(keys.pw !== params.hash) {
-        resolve(false);
-      } else {
-        resolve(true);
-      }
-    })
+    const params = this.passcodeAuthParams();
+    let keys = await protocolManager.computeRootKey({password: passcode, authParams: params});
+    if(keys.serverAuthenticationValue !== params.hash) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
-  unlock(passcode, callback) {
-    var params = this.passcodeAuthParams();
-    protocolManager.computeEncryptionKeysForUser(passcode, params).then((keys) => {
-      if(keys.pw !== params.hash) {
-        callback(false);
-        return;
-      }
+  async unlock(passcode, callback) {
+    const params = this.passcodeAuthParams();
+    const keys = await protocolManager.computeRootKey({password: passcode, authParams: params});
+    if(keys.serverAuthenticationValue !== params.hash) {
+      callback(false);
+      return;
+    }
 
-      this._keys = keys;
-      this._authParams = params;
-      this.decryptLocalStorage(keys, params).then(() => {
-        this._locked = false;
-        callback(true);
-      })
-    });
+    this._keys = keys;
+    this._authParams = params;
+    this.decryptLocalStorage(keys, params).then(() => {
+      this._locked = false;
+      callback(true);
+    })
   }
 
   setPasscode(passcode, callback) {
     var uuid = protocolManager.crypto.generateUUIDSync();
 
-    protocolManager.generateInitialKeysAndAuthParamsForUser(uuid, passcode).then((results) => {
+    protocolManager.createRootKey({identifier: uuid, password: passcode}).then((results) => {
       let keys = results.keys;
       let authParams = results.authParams;
 
-      authParams.hash = keys.pw;
+      authParams.hash = keys.serverAuthenticationValue;
       this._keys = keys;
       this._hasPasscode = true;
       this._authParams = authParams;

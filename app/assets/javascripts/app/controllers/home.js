@@ -79,12 +79,12 @@ export class Home {
 
       syncManager.setKeyRequestHandler(async () => {
         let offline = authManager.offline();
-        let auth_params = offline ? passcodeManager.passcodeAuthParams() : await authManager.getAuthParams();
+        let keyParams = offline ? passcodeManager.passcodeAuthParams() : await authManager.getAuthParams();
         let keys = offline ? passcodeManager.keys() : await authManager.keys();
         return {
           keys: keys,
           offline: offline,
-          auth_params: auth_params
+          keyParams: keyParams
         }
       });
 

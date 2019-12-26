@@ -15,7 +15,16 @@ export class PasswordWizard {
   }
 
   /* @ngInject */
-  controller($scope, modelManager, archiveManager, authManager, syncManager, $timeout, alertManager) {
+  controller(
+    $scope,
+    modelManager,
+    archiveManager,
+    authManager,
+    keyManager,
+    syncManager,
+    $timeout,
+    alertManager
+  ) {
 
     window.onbeforeunload = (e) => {
       // Confirms with user to close tab before closing
@@ -211,17 +220,17 @@ export class PasswordWizard {
       }
 
       // Ensure value for current password matches what's saved
-      let authParams = await authManager.getAuthParams();
-      let password = $scope.formData.currentPassword;
-      protocolManager.computeEncryptionKeysForUser(password, authParams).then(async (keys) => {
-        let success = keys.mk === (await authManager.keys()).mk;
-        if(success) {
-          this.currentServerPw = keys.pw;
-        } else {
-          alertManager.alert({text: "The current password you entered is not correct. Please try again."});
-        }
-        $timeout(() => callback(success));
-      });
+      const keyParams = await keyManager.getRootKeyKeyParams();
+      const password  = $scope.formData.currentPassword;
+      const candidateKey = await protocolManager.computeRootKeyForUser({password, authParams});
+      const currentKey   = await keyManager.getRootKey();
+      let success = await protocolManager.compareKeys(candidateKey, currentKey);
+      if(success) {
+        this.serverAuthenticationValue = candidateKey.serverAuthenticationValue;
+      } else {
+        alertManager.alert({text: "The current password you entered is not correct. Please try again."});
+      }
+      $timeout(() => callback(success));
     }
 
     $scope.resyncData = function(callback) {
@@ -237,24 +246,31 @@ export class PasswordWizard {
     }
 
     $scope.processPasswordChange = async function(callback) {
-      let newUserPassword = $scope.securityUpdate ? $scope.formData.currentPassword : $scope.formData.newPassword;
+      const newUserPassword = $scope.securityUpdate ? $scope.formData.currentPassword : $scope.formData.newPassword;
+      const result = await protocolManager.createRootKey({
+        identifier: authManager.user.email,
+        password: newUserPassword
+      });
 
-      let currentServerPw = this.currentServerPw;
-
-      let results = await protocolManager.generateInitialKeysAndAuthParamsForUser(authManager.user.email, newUserPassword);
-      let newKeys = results.keys;
-      let newAuthParams = results.authParams;
+      let newRootKey = result.key;
+      let newRootKeyParams = result.keyParams;
 
       // perform a sync beforehand to pull in any last minutes changes before we change the encryption key (and thus cant decrypt new changes)
       let syncResponse = await syncManager.sync();
-      authManager.changePassword(await syncManager.getServerURL(), authManager.user.email, currentServerPw, newKeys, newAuthParams).then((response) => {
-        if(response.error) {
-          alertManager.alert({text: response.error.message ? response.error.message : "There was an error changing your password. Please try again."});
-          $timeout(() => callback(false));
-        } else {
-          $timeout(() => callback(true));
-        }
-      })
+      const response = await authManager.changePassword({
+        url: await syncManager.getServerURL(),
+        email: authManager.user.email,
+        serverAuthenticationValue: this.serverAuthenticationValue,
+        newRootKey: newRootKey,
+        newRootKeyParams: newRootKeyParams
+      });
+
+      if(response.error) {
+        alertManager.alert({text: response.error.message ? response.error.message : "There was an error changing your password. Please try again."});
+        $timeout(() => callback(false));
+      } else {
+        $timeout(() => callback(true));
+      }
     }
   }
 }
